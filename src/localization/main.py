@@ -5,10 +5,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from constants import aruco_position, mtx, dist
 import rclpy
-import pyrealsense as pyrs
 from nav_msgs.msg import OccupancyGrid, MapMetaData
 
-INVERSE_LOCALIZATION = False
 DISPLAY = True
 GRID_RESOLUTION = 0.01
 
@@ -18,7 +16,7 @@ class Grid(Node):
         self.publisher_ = self.create_publisher(OccupancyGrid, '/light_grid', 10)
 
     def publish(self, img):
-        img = ((img / 255) * 127).astype(np.int8)
+        img = ((img / 255) * 100).astype(np.int8)
 
         msg = OccupancyGrid()
         msg.header.frame_id = 'world'
@@ -65,13 +63,12 @@ pose_node = Pose()
 detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50), cv2.aruco.DetectorParameters())
 
 # r200 initialization
-serv = pyrs.Service()
-cam = serv.Device(device_id = 0, streams = [pyrs.stream.ColorStream(fps = 60), ]) # type: ignore
+cap = cv2.VideoCapture(6)
+cap.set(cv2.CAP_PROP_EXPOSURE, 1000)
+cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
 
 while True:
-    cam.wait_for_frames()
-    frame = cam.color
-    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    ret, frame = cap.read()
     
     # get corners and display if enabled
     corners, ids, _ = detector.detectMarkers(frame)

@@ -9,7 +9,6 @@ room_grid[(1, 3)] = 1
 
 
 robot_start = (1, 1)
-robot_size = 10
 
 
 # if we use height and width to find spots 
@@ -28,7 +27,7 @@ room_grid = np.array([
 # find the center of mass for the brightest spot, whites are therolded to be 1s
 # we are going to assume that there are no obstacles
 
-def find_target(room_grid):
+def find_target(room_grid, robot_start = robot_start, robot_size = (robot_width, robot_height)):
 
     labeled_array, num_spots = ndimage.label(room_grid) # finds all the light spots and label them
     centers = ndimage.center_of_mass(room_grid, labeled_array, range(1, num_spots + 1)) 
@@ -53,7 +52,6 @@ def find_target(room_grid):
             return centers[idx[0]]'''
 
         spot_size = find_height_width(labeled_array, idx[0])
-        robot_size = [robot_height, robot_width]
       
         if all(a > b for a, b in zip(spot_size, robot_size)):
             return centers[idx[0]]

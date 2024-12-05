@@ -24,21 +24,22 @@ class Driver(Node):
             '/bright_point',
             self.goal_callback,
             10)
-        self.goal_subscription      
+             
         self.pose_subscription = self.create_subscription(
             PoseStamped,
             '/camera_pose',
             self.position_callback,
             10)
-        self.pose_subscription
+        
 
     
     def position_callback(self, msg):
         # Adjust the proportional drive with every callback
-        self.current_position = msg
+        self.current_point = msg
 
-        if(self.position is not None):
+        if self.point is not None:
             # go to goal
+            self.go_to_light()
 
     def goal_callback(self, msg):
         # set a point and remember it? Then repeat after some amount of time has elapsed?
@@ -47,6 +48,17 @@ class Driver(Node):
     def go_to_light(self):
         #take in positional data and calculate angle and distance. Send twist commands until
         #both are zero or under a given margin
+
+        if self.point is None or self.current_point is None:
+            return
+
+        cur_pose = self.current_point.pose.position
+        cur_orientation = self.current_point.pose.orientation
+
+        self.get_logger().info(f"Current Position: {cur_pose.x}, {cur_pose.y}, {cur_pose.z}")
+        self.get_logger().info(f"Current Orientation: {cur_orientation.x}, {cur_orientation.y}, {cur_orientation.z}, {cur_orientation.w}")
+
+        self.get_logger().info(f"Goal Position: {self.point.x}, {self.point.y}, {self.point.z}")
 
 if __name__ == "__main__":
 

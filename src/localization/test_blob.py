@@ -1,81 +1,72 @@
 import cv2
 import numpy as np
-from scipy import ndimage
 from rclpy.node import Node
 from geometry_msgs.msg import Point
+from nav_msgs.msg import OccupancyGrid
 import rclpy
 
 
-class BlobDetector(Node):
+class BlobFinder(Node):
     def __init__(self):
-        super().__init__('blob_detector')  # Initialize the node
-        self.publisher_ = self.create_publisher(Point, '/bright_point1', 10)  # Publisher for blob centroid
+        super().__init__('blob_finder')  # Initialize the node
+        self.publisher_ = self.create_publisher(Point, '/bright_point1', 10)  # Publisher for centroid
+        self.map_subscription = self.create_subscription(
+            OccupancyGrid,
+            '/light_grid',
+            self.map_callback,
+            10
+        )
 
-        # Camera Initialization
-        self.cap = cv2.VideoCapture(6)  # Use your camera index
-        self.cap.set(cv2.CAP_PROP_EXPOSURE, 100)
-        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+    def map_callback(self, msg):
+        """Callback to process the OccupancyGrid and find the centroid of the largest blob."""
+        try:
+            # Convert OccupancyGrid data to a 2D numpy array
+            grid = np.array(msg.data, dtype=np.uint8).reshape((msg.info.height, msg.info.width))
 
-        self.timer = self.create_timer(0.1, self.process_frame)  # Process frames at 10 Hz
+            # Normalize grid to binary image
+            binary_grid = ((grid > 0) * 255).astype(np.uint8)
 
-    def process_frame(self):
-        """Process a single frame from the camera to detect the largest blob."""
-        ret, frame = self.cap.read()
-        if not ret:
-            self.get_logger().error("Failed to read from camera.")
-            return
+            # Find contours
+            contours, _ = cv2.findContours(binary_grid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Convert frame to grayscale
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if contours:
+                # Find the largest contour
+                largest_contour = max(contours, key=cv2.contourArea)
 
-        # Threshold to create a binary image (adjust threshold as needed)
-        _, binary_frame = cv2.threshold(gray_frame, 200, 255, cv2.THRESH_BINARY)
+                # Calculate the centroid of the largest blob
+                M = cv2.moments(largest_contour)
+                if M["m00"] != 0:
+                    cx = int(M["m10"] / M["m00"])
+                    cy = int(M["m01"] / M["m00"])
 
-        # Detect blobs using connected components
-        labeled_array, num_spots = ndimage.label(binary_frame)
+                    # Convert centroid to world coordinates
+                    world_x = cx * msg.info.resolution + msg.info.origin.position.x
+                    world_y = cy * msg.info.resolution + msg.info.origin.position.y
 
-        if num_spots > 0:
-            # Find the largest blob
-            blob_sizes = ndimage.sum(binary_frame, labeled_array, range(1, num_spots + 1))
-            largest_blob_idx = np.argmax(blob_sizes) + 1  # Labels are 1-based
-            centroid = ndimage.center_of_mass(binary_frame, labeled_array, largest_blob_idx)
+                    # Publish the centroid
+                    point = Point()
+                    point.x = world_x
+                    point.y = world_y
+                    point.z = 0.0
+                    self.publisher_.publish(point)
 
-            # Publish the centroid as a Point message
-            point = Point()
-            point.x = float(centroid[1])  # X-coordinate in image space
-            point.y = float(centroid[0])  # Y-coordinate in image space
-            point.z = 0.0  # Assuming 2D
+                    # Log the centroid
+                    self.get_logger().info(f"Blob Centroid: x={point.x}, y={point.y}")
+                else:
+                    self.get_logger().warning("Largest blob has zero area.")
+            else:
+                self.get_logger().warning("No blobs found in the grid.")
 
-            self.publisher_.publish(point)
-
-            # Log the detected centroid
-            self.get_logger().info(f"Detected Brightest Blob Centroid: x={point.x}, y={point.y}")
-
-            # Optional: Visualize the results
-            cv2.circle(frame, (int(centroid[1]), int(centroid[0])), 5, (0, 0, 255), -1)
-            cv2.imshow("Blob Detection", frame)
-        else:
-            self.get_logger().warning("No blobs detected in the frame.")
-
-        # Display the frame (press 'q' to quit)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            self.cap.release()
-            cv2.destroyAllWindows()
-            rclpy.shutdown()
-
-    def destroy_node(self):
-        """Release resources."""
-        self.cap.release()
-        cv2.destroyAllWindows()
-        super().destroy_node()
+        except Exception as e:
+            self.get_logger().error(f"Error processing light grid: {e}")
 
 
 def main(args=None):
     rclpy.init(args=args)
-    blob_detector = BlobDetector()
-    rclpy.spin(blob_detector)
+    blob_finder = BlobFinder()
+    rclpy.spin(blob_finder)
 
-    blob_detector.destroy_node()
+    blob_finder.destroy_node()
     rclpy.shutdown()
 
 

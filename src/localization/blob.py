@@ -33,10 +33,10 @@ def find_target(room_grid, robot_start = robot_start, robot_size = (robot_width,
     labeled_array, num_spots = ndimage.label(room_grid) # finds all the light spots and label them
     centers = ndimage.center_of_mass(room_grid, labeled_array, range(1, num_spots + 1)) 
    
-    '''
+    
     # find the size of these spots to make sure they can fit the pupper
     sizes = ndimage.sum(room_grid, labeled_array, range(1, num_spots + 1))
-    '''
+    
     # if we want to find the largest 
     largest_spot_index = np.argmax(sizes)
     largest_spot_center = centers[largest_spot_index]

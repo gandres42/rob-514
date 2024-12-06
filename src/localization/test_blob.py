@@ -23,6 +23,10 @@ class BlobFinder(Node):
             # Convert OccupancyGrid data to a 2D numpy array
             grid = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
 
+            # Debug grid properties
+            self.get_logger().info(f"Grid Resolution: {msg.info.resolution}, Origin: ({msg.info.origin.position.x}, {msg.info.origin.position.y})")
+            self.get_logger().info(f"Grid Size: {msg.info.width}x{msg.info.height}")
+
             # Normalize grid to binary image
             binary_grid = ((grid > 0) * 255).astype(np.uint8)
 
@@ -43,6 +47,10 @@ class BlobFinder(Node):
                     world_x = cx * msg.info.resolution + msg.info.origin.position.x
                     world_y = (msg.info.height - cy) * msg.info.resolution + msg.info.origin.position.y
 
+                    # Debug centroid calculation
+                    self.get_logger().info(f"Centroid (grid): ({cx}, {cy})")
+                    self.get_logger().info(f"Centroid (world): ({world_x}, {world_y})")
+
                     # Publish the centroid
                     point = Point()
                     point.x = world_x
@@ -50,8 +58,6 @@ class BlobFinder(Node):
                     point.z = 0.0
                     self.publisher_.publish(point)
 
-                    # Log the centroid
-                    self.get_logger().info(f"Blob Centroid: x={point.x}, y={point.y} (world)")
                 else:
                     self.get_logger().warning("Largest blob has zero area.")
             else:

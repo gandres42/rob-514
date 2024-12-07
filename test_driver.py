@@ -29,7 +29,7 @@ class Driver(Node):
 
         self.pose_subscription = self.create_subscription(
             PoseStamped,
-            '/camera_pose',  # Placeholder for pose topic
+            '/dog_pose',  # Placeholder for pose topic
             self.position_callback,
             10)
 

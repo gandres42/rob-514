@@ -9,7 +9,7 @@ import rclpy
 class BlobFinder(Node):
     def __init__(self):
         super().__init__('blob_finder')  # Initialize the node
-        self.publisher_ = self.create_publisher(Point, '/bright_point1', 10)  # Publisher for centroid
+        self.publisher_ = self.create_publisher(Point, '/bright_point', 10)  # Publisher for centroid
         self.map_subscription = self.create_subscription(
             OccupancyGrid,
             '/light_grid',
@@ -53,8 +53,8 @@ class BlobFinder(Node):
 
                     # Publish the centroid
                     point = Point()
-                    point.x = world_x
-                    point.y = world_y
+                    point.x = float(cx)
+                    point.y = float(cy)
                     point.z = 0.0
                     self.publisher_.publish(point)
 

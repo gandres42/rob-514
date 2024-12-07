@@ -14,7 +14,7 @@ GRID_RESOLUTION = 0.01
 class Grid(Node):
     def __init__(self):
         super().__init__('grid')
-        self.publisher_ = self.create_publisher(OccupancyGrid, '/light_grid', 10)
+        self.grid_publisher_ = self.create_publisher(OccupancyGrid, '/light_grid', 10)
 
     def publish(self, img):
         img = ((img / 255) * 100).astype(np.int8)
@@ -31,14 +31,16 @@ class Grid(Node):
         msg.info.origin.position.y = 0.0
         msg.info.origin.position.z = 0.0
         msg.data = img.flatten('F').tolist()
-        self.publisher_.publish(msg)
+        self.grid_publisher_.publish(msg)
 
 class Pose(Node):
     def __init__(self):
         super().__init__('overthruster') # type: ignore
-        self.publisher_ = self.create_publisher(PoseStamped, '/camera_pose', 10)
+        self.publisher_ = self.create_publisher(PoseStamped, '/dog_pose', 10)
+        self.point_publisher_ = self.create_publisher(Point, '/dog_point', 10)
 
     def publish(self, coords, rvec):
+        print(coords)
         msg = PoseStamped()
         msg.header.frame_id = 'world'
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -54,6 +56,12 @@ class Pose(Node):
         msg.pose.position.z = 0.0
 
         self.publisher_.publish(msg)
+
+        point = Point()
+        point.x = float(coords[0])
+        point.y = float(coords[1])
+        point.z = 0.0
+        self.point_publisher_.publish(point)
 
 class PointObserver(Node):
 
@@ -81,9 +89,9 @@ observer = PointObserver()
 detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50), cv2.aruco.DetectorParameters())
 
 # r200 initialization
-# cap = cv2.VideoCapture(6) # TODO: put this back when using actual camera
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_EXPOSURE, 1000)
+cap = cv2.VideoCapture(6) # TODO: put this back when using actual camera
+# cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_EXPOSURE, 100)
 cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
 
 while True:
@@ -91,7 +99,7 @@ while True:
     
     # get corners and display if enabled
     corners, ids, _ = detector.detectMarkers(frame)
-    if ids is not None: cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+    # if ids is not None: cv2.aruco.drawDetectedMarkers(frame, corners, ids)
     
     # flatten corners into usable format, skip if none detected
     if ids is not None and 0 in ids:
@@ -112,12 +120,13 @@ while True:
         grid_node.publish(thresh_frame)
         rot = cv2.Rodrigues(rvec)[0]
         coords = np.mean(corners, axis=0)
+
         pose_node.publish(coords, rot)
 
     rclpy.spin_once(observer, timeout_sec=0.05)
     if observer.point:
-        print(f"Observer: {observer.point}")
-        cv2.circle(frame, observer.point, 4, (0, 0, 255), -1)
+        # print(f"Observer: {observer.point}")
+        cv2.circle(frame, (observer.point[1], observer.point[0]), 4, (0, 0, 255), -1)
         cv2.circle(frame, (int(coords[0]), int(coords[1])), 4, (255,0,0), -1)
 
     cv2.imshow('Camera', frame)

@@ -4,13 +4,19 @@ This file holds the driver node which reads in the current pose and goal point, 
 """
 import numpy as np
 
-from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped, Point, Twist
-from constants import aruco_position, mtx, dist
 import rclpy
 
-ALPHA = 2
-BETA = 0.8
+from constants import aruco_position, mtx, dist
+from geometry_msgs.msg import PoseStamped, Point, Twist
+from networktables import NetworkTables
+from rclpy.node import Node
+from scipy.spatial.transform import Rotation
+from networktables.util import ntproperty
+
+# Gross Hardcoded Server IP
+IP = "10.214.154.192"
+NetworkTables.initialize(server=IP)
+
 
 class Driver(Node):
     def __init__(self):
@@ -18,10 +24,9 @@ class Driver(Node):
         self.point = None
         self.current_point = None
 
-        self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
         self.goal_subscription = self.create_subscription(
             Point,
-            '/bright_point1',
+            '/bright_point',
             self.goal_callback,
             10)
              
@@ -53,11 +58,24 @@ class Driver(Node):
         cur_pose = self.current_point.pose.position
         cur_orientation = self.current_point.pose.orientation
 
+        angles = Rotation.from_quat(cur_orientation).as_euler('zxy')
+
+        sd = NetworkTables.getTable("PositionTable")
+        sd.putNumber("pos_x", cur_pose.x)
+        sd.putNumber("pos_y", cur_pose.y)
+        sd.putNumber("pos_z", cur_pose.z)
+        sd.putNumber("angle_z", angles[0])
+        sd.putNumber("goal_x", self.point.x)
+        sd.putNumber("goal_y", self.point.y)
+        sd.putNumber("goal_z", self.point.y)
+
         self.get_logger().info(f"Current Position: {cur_pose.x}, {cur_pose.y}, {cur_pose.z}")
         
-        self.get_logger().info(f"Current Orientation: {cur_orientation.x}, {cur_orientation.y}, {cur_orientation.z}, {cur_orientation.w}")
+        self.get_logger().info(f"Current Orientation: {angles}")
 
         self.get_logger().info(f"Goal Position: {self.point.x}, {self.point.y}, {self.point.z}")
+        
+        
 
 if __name__ == "__main__":
     rclpy.init()

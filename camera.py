@@ -89,7 +89,7 @@ observer = PointObserver()
 detector = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50), cv2.aruco.DetectorParameters())
 
 # r200 initialization
-cap = cv2.VideoCapture(6) # TODO: put this back when using actual camera
+cap = cv2.VideoCapture(6)
 # cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_EXPOSURE, 100)
 cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)

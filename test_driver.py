@@ -5,17 +5,20 @@ import numpy as np
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped, Point, Twist
 import rclpy
+import math
+import time
 
 # Control parameters
 ALPHA = 2.0  # Proportional control for rotation
 BETA = 0.8   # Proportional control for forward motion
-PIXEL_THRESHOLD = 100  # Distance threshold in pixels
+PIXEL_THRESHOLD = 20  # Distance threshold in pixels
 
 class Driver(Node):
     def __init__(self):
         super().__init__('driver')  # Initialize the node
-        self.point = None  # Goal point in pixels
+        self.goal_point = None  # Goal point in pixels
         self.current_point = None  # Current pose in pixels and orientation
+        self.current_pose = None 
 
         # Publisher for velocity commands
         self.publisher_ = self.create_publisher(Twist, '/cmd_vel', 10)
@@ -27,50 +30,56 @@ class Driver(Node):
             self.goal_callback,
             10)
 
-        self.pose_subscription = self.create_subscription(
+        self.current_point_subscription = self.create_subscription(
+            Point,
+            '/dog_point',  # Placeholder for pose topic
+            self.point_callback,
+            10)
+        
+        self.current_pose_subscription = self.create_subscription(
             PoseStamped,
             '/dog_pose',  # Placeholder for pose topic
-            self.position_callback,
+            self.pose_callback,
             10)
 
-    def position_callback(self, msg):
+    def point_callback(self, msg):
         """Callback for current position updates."""
         self.current_point = msg
-        if self.point is not None:
-            self.go_to_light()
+        self.go_to_light()
+
+    def pose_callback(self, msg):
+        """Callback for current position updates."""
+        self.current_pose = msg
 
     def goal_callback(self, msg):
         """Callback for goal updates."""
-        self.point = msg
+        self.goal_point = msg
 
     def go_to_light(self):
         """Navigate towards the light centroid."""
-        if self.point is None or self.current_point is None:
+        if self.goal_point is None or self.current_point is None or self.current_pose is None:
             return
 
         # Extract current position and orientation
-        cur_pose = self.current_point.pose.position
-        cur_orientation = self.current_point.pose.orientation
-
-        # Convert quaternion to yaw
-        yaw = self.quaternion_to_yaw(cur_orientation)
+        yaw = self.current_pose.pose.orientation.z
 
         # Calculate distance to the light centroid
-        dx = self.point.x - cur_pose.x
-        dy = self.point.y - cur_pose.y
+        dx = self.goal_point.x - self.current_point.x
+        dy = self.goal_point.y - self.current_point.y
         distance_to_goal = np.sqrt(dx**2 + dy**2)
 
         # Calculate the angle to the light centroid
-        angle_to_goal = np.arctan2(dy, dx)
+        angle_to_goal = np.arctan2(dx, dy)
 
         # Calculate the angle difference
-        angle_diff = self.normalize_angle(angle_to_goal - yaw)
+        # angle_diff = self.normalize_angle(angle_to_goal - yaw)
+        angle_diff = (angle_to_goal - yaw) + .8
 
         # Create Twist message
         twist = Twist()
 
         if distance_to_goal > PIXEL_THRESHOLD:
-            if abs(angle_diff) > 0.1:  # Rotate towards the goal
+            if abs(angle_diff) > 1:  # Rotate towards the goal
                 twist.angular.z = ALPHA * angle_diff
                 twist.linear.x = 0.0
             else:  # Move towards the goal
@@ -84,33 +93,27 @@ class Driver(Node):
         # Publish the Twist message
         self.publisher_.publish(twist)
 
+        # time.sleep(10)
+
         # Log current status
+        self.get_logger().info(f"Current position: {self.current_point.x}, {self.current_point.y}")
         self.get_logger().info(f"Distance to goal: {distance_to_goal}")
+        self.get_logger().info(f"Angle: {yaw}")
         self.get_logger().info(f"Angle to goal: {angle_to_goal}")
         self.get_logger().info(f"Angle difference: {angle_diff}")
 
-    @staticmethod
-    def quaternion_to_yaw(orientation):
-        """Convert quaternion to yaw angle."""
-        siny_cosp = 2.0 * (orientation.w * orientation.z + orientation.x * orientation.y)
-        cosy_cosp = 1.0 - 2.0 * (orientation.y**2 + orientation.z**2)
-        return np.arctan2(siny_cosp, cosy_cosp)
-
-    @staticmethod
-    def normalize_angle(angle):
+    def normalize_angle(self, angle):
         """Normalize angle to the range [-pi, pi]."""
         while angle > np.pi:
             angle -= 2 * np.pi
         while angle < -np.pi:
             angle += 2 * np.pi
-        return angle
-
+        return angle + .8
 
 def main(args=None):
     rclpy.init(args=args)
     driver_node = Driver()
     rclpy.spin(driver_node)
-
     driver_node.destroy_node()
     rclpy.shutdown()
 

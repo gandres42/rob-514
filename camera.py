@@ -40,7 +40,6 @@ class Pose(Node):
         self.point_publisher_ = self.create_publisher(Point, '/dog_point', 10)
 
     def publish(self, coords, rvec):
-        print(coords)
         msg = PoseStamped()
         msg.header.frame_id = 'world'
         msg.header.stamp = self.get_clock().now().to_msg()
